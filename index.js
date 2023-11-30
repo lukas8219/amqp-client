@@ -57,9 +57,10 @@ function generateStartOkBuffer(){
     frameBuffer.writeUint8(mechanismBuffer.byteLength, currentByteOffset);
     currentByteOffset += frameBuffer.write("PLAIN", ++currentByteOffset);
 
+    //006775657374006775657374
     const responseBuffer = Buffer.from(`\u0000guest\u0000guest`);
     frameBuffer.writeUint32BE(responseBuffer.byteLength, ++currentByteOffset); currentByteOffset += 4;
-    currentByteOffset += frameBuffer.write(`\u0000guest\u0000guest`, ++currentByteOffset);
+    currentByteOffset += frameBuffer.write(`\u0000guest\u0000guest`, currentByteOffset);
 
     const localeBuffer = Buffer.from("en_US");
     frameBuffer.writeUint8(localeBuffer.byteLength, currentByteOffset);
