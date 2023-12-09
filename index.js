@@ -1,9 +1,7 @@
 const { Socket } = require('net');
-const { ConnectionStartOk } = require('./frames');
+const { ShortString, LongString } = require('./amqp-data-types');
 
 const { Buffer } = require('buffer');
-
-
 
 function generateStartOkBuffer(){
     // Connection.StartOk frame parameters
@@ -29,7 +27,7 @@ function generateStartOkBuffer(){
     }
 
     payloadBuffer = payloadBuffer.subarray(0, byteOffset);
-
+    
     // Calculate the correct frame size
     const frameSize = payloadBuffer.byteLength;
 
@@ -38,13 +36,14 @@ function generateStartOkBuffer(){
     const methodId = 11;
     const frameType = 1; // Connection.StartOk frame type -> METHOD
     const channel = 0; // For connection-level frames
+
     const frameBuffer = Buffer.alloc(4096); // Add 1 for the frame end marker
     frameBuffer.writeUInt8(frameType, 0); // Frame type
     frameBuffer.writeUInt16BE(channel, 1); // Channel
-    //framesize + 2 = 3
-    //for clazz + 4 = 
+
+    //RESERVER 3rd byte (1 octets) for Frame Size = 3
     frameBuffer.writeUInt16BE(classId, 7); // Method ID
-    frameBuffer.writeUint16BE(methodId, 7+2);
+    frameBuffer.writeUint16BE(methodId, 7 + 2);
 
     const argumentsLengthByteOffset = 7 + 2 + 1 + 1;
 
@@ -54,33 +53,15 @@ function generateStartOkBuffer(){
 
     let currentByteOffset = frameSize + argumentsLengthByteOffset + 4;
 
-    const mechanismBuffer = Buffer.from("PLAIN");
-    frameBuffer.writeUint8(mechanismBuffer.byteLength, currentByteOffset);
-    currentByteOffset += frameBuffer.write("PLAIN", ++currentByteOffset);
-
-    const responseBuffer = Buffer.from(`\u0000guest\u0000guest`);
-    frameBuffer.writeUint32BE(responseBuffer.byteLength, ++currentByteOffset); currentByteOffset += 4;
-    currentByteOffset += frameBuffer.write(`\u0000guest\u0000guest`, currentByteOffset);
-
-    const localeBuffer = Buffer.from("en_US");
-    frameBuffer.writeUint8(localeBuffer.byteLength, currentByteOffset);
-    currentByteOffset += frameBuffer.write("en_US", ++currentByteOffset);
+    const mechanismFrameLength = new ShortString("PLAIN").copyTo(frameBuffer, currentByteOffset); currentByteOffset += mechanismFrameLength;
+    const responseFrameLength = new LongString(`\u0000guest\u0000guest`).copyTo(frameBuffer, ++currentByteOffset); currentByteOffset += responseFrameLength;
+    const localeFrameLength = new ShortString("en_US").copyTo(frameBuffer, currentByteOffset); currentByteOffset += localeFrameLength;
 
     frameBuffer.writeUInt8(0xCE, ++currentByteOffset); // Frame end marker
 
-    frameBuffer.writeUInt32BE(
-        frameSize + 2
-        + mechanismBuffer.byteLength
-        + 4
-        + responseBuffer.byteLength
-        + 2
-        + localeBuffer.byteLength
-        + 2
-        + 4, 3); // Payload size excluding the method ID (4 bytes)
+    frameBuffer.writeUInt32BE(currentByteOffset - 7, 3); //TODO understand why - 7. Probably some miscalc up there
 
-    const finalBuffer = frameBuffer.subarray(0, ++currentByteOffset);
-
-    return  finalBuffer;
+    return  frameBuffer.subarray(0, ++currentByteOffset);
 }
 
 function generateTuneOkFrame(channelMax, frameSizeMax, heartbeat){
@@ -123,10 +104,11 @@ function generateConnectionOpenFrame(){
     frameBuffer.writeUInt16BE(channel, frameOffset += 1); // Channel
     frameBuffer.writeUInt16BE(classId, frameOffset += (4+2)); // ClassID
     frameBuffer.writeUInt16BE(methodId, frameOffset += 2);
+    
+    const vhostFrameLength = new ShortString("/").copyTo(frameBuffer, frameOffset += 2);
+    frameOffset += vhostFrameLength;
 
-    const vhost = Buffer.from("/");
-    frameBuffer.writeUint8(vhost.byteLength, frameOffset += 2);
-    vhost.copy(frameBuffer, frameOffset += 1);
+    //SKIP Reserverd Bytes - two octets (8 bytes)
     frameOffset += 1 + 1;
     
     frameBuffer.writeUint32BE(frameOffset - 4 - 2, 3);
@@ -193,7 +175,6 @@ async function run(){
             if(classId === 10 && methodId === 10){
                 console.log(`Received Connection#Start -> replying Connection#Start.Ok`);
                 const frame = generateStartOkBuffer();
-//                const frame = new ConnectionStartOk().toBuffer();
                 console.log(`writing package with byteLength ${frame.byteLength}`)
                 const flushed = connection.write(frame);
                 if(!flushed){
@@ -208,7 +189,7 @@ async function run(){
                 const heartBeat = view.getInt16(frameOffset += 4);
 
                 console.log('server tunning parameters', JSON.stringify({ channelMax, frameSizeMax, heartBeat }));
-                const responseFrame = generateTuneOkFrame(channelMax, 4096, 3);
+                const responseFrame = generateTuneOkFrame(channelMax, 4096, 60 );
 
                 const connectionOpenFrame = generateConnectionOpenFrame();
 
