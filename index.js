@@ -150,10 +150,11 @@ function generateChannelOpenFrame(channelId){
     frameBuffer.writeUInt16BE(classId, frameOffset += (4+2)); // ClassID
     frameBuffer.writeUInt16BE(methodId, frameOffset += 2);
 
-    frameBuffer.writeUint8(0, frameOffset += 1);
+    frameBuffer.writeUInt8(0, frameOffset += 2);
+    ++frameOffset;
 
-    frameBuffer.writeUint32BE(frameOffset, 3);
-    frameBuffer.writeUint8(0xCE, frameOffset += 1);
+    frameBuffer.writeUInt32BE(5, 3);
+    frameBuffer.writeUInt8(0xCE, frameOffset);
     return frameBuffer.subarray(0, ++frameOffset);
 }
 
@@ -179,8 +180,8 @@ async function run(){
         }
 
         if(type === 8){
-            //NOT WORKING PROPERLY
-            connection.write(heartbeatFrame());
+            console.log(`heartbeat`);
+            return connection.write(heartbeatFrame());
         }
 
         if(type === 1){
@@ -224,8 +225,8 @@ async function run(){
 
             if(classId === 10 && methodId === 41){
                 console.log(`received Connection#OpenOk -> temporarily replying w/ Channel#Open`);
-                //const channelOpenFrame = generateChannelOpenFrame(1);
-                //connection.write(channelOpenFrame);
+                const channelOpenFrame = generateChannelOpenFrame(1);
+                return connection.write(channelOpenFrame);
             }
 
             if(classId === 10 && methodId === 50){
