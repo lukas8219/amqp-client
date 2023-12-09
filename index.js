@@ -38,30 +38,28 @@ function generateStartOkBuffer(){
     const channel = 0; // For connection-level frames
 
     const frameBuffer = Buffer.alloc(4096); // Add 1 for the frame end marker
-    frameBuffer.writeUInt8(frameType, 0); // Frame type
-    frameBuffer.writeUInt16BE(channel, 1); // Channel
 
-    //RESERVER 3rd byte (1 octets) for Frame Size = 3
-    frameBuffer.writeUInt16BE(classId, 7); // Method ID
-    frameBuffer.writeUint16BE(methodId, 7 + 2);
+    let bOffset = 0;
 
-    const argumentsLengthByteOffset = 7 + 2 + 1 + 1;
+    frameBuffer.writeUInt8(frameType, bOffset); bOffset += 1; // Frame type offset 0
+    frameBuffer.writeUInt16BE(channel, bOffset); bOffset += 2 // Channel offset 1
+    //RESERVE 3rd - 7th byte (4 octets) for Frame Size offset 3 - 4 octets
+    bOffset += 4;
+    frameBuffer.writeUInt16BE(classId, bOffset); bOffset += 2; // Method ID
+    frameBuffer.writeUint16BE(methodId, bOffset); bOffset += 2;
 
-    frameBuffer.writeUint32BE(frameSize, argumentsLengthByteOffset);
+    //Writes clientProperties
+    frameBuffer.writeUint32BE(frameSize, bOffset); bOffset += 4;
 
-    payloadBuffer.copy(frameBuffer, argumentsLengthByteOffset + 4, 0, byteOffset);
+    const writtenBytes = payloadBuffer.copy(frameBuffer, bOffset, 0, byteOffset); bOffset += writtenBytes;
 
-    let currentByteOffset = frameSize + argumentsLengthByteOffset + 4;
+    const mechanismFrameLength = new ShortString("PLAIN").copyTo(frameBuffer, bOffset); bOffset += mechanismFrameLength;
+    const responseFrameLength = new LongString(`\u0000guest\u0000guest`).copyTo(frameBuffer, ++bOffset); bOffset += responseFrameLength;
+    const localeFrameLength = new ShortString("en_US").copyTo(frameBuffer, bOffset); bOffset += localeFrameLength;
 
-    const mechanismFrameLength = new ShortString("PLAIN").copyTo(frameBuffer, currentByteOffset); currentByteOffset += mechanismFrameLength;
-    const responseFrameLength = new LongString(`\u0000guest\u0000guest`).copyTo(frameBuffer, ++currentByteOffset); currentByteOffset += responseFrameLength;
-    const localeFrameLength = new ShortString("en_US").copyTo(frameBuffer, currentByteOffset); currentByteOffset += localeFrameLength;
-
-    frameBuffer.writeUInt8(0xCE, ++currentByteOffset); // Frame end marker
-
-    frameBuffer.writeUInt32BE(currentByteOffset - 7, 3); //TODO understand why - 7. Probably some miscalc up there
-
-    return  frameBuffer.subarray(0, ++currentByteOffset);
+    frameBuffer.writeUInt32BE(bOffset - 6, 3);
+    frameBuffer.writeUInt8(0xCE, ++bOffset); // Frame end marker
+    return  frameBuffer.subarray(0, ++bOffset);
 }
 
 function generateTuneOkFrame(channelMax, frameSizeMax, heartbeat){
