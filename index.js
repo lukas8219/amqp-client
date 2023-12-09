@@ -105,10 +105,8 @@ function generateTuneOkFrame(channelMax, frameSizeMax, heartbeat){
     frameBuffer.writeUInt32BE(frameOffset - 4 - 1, 3);
 
     frameBuffer.writeUInt8(0xCE, frameOffset += 2); frameOffset++;
-    
-    console.log(`packet size is ${frameOffset}`);
 
-    return frameBuffer.subarray(0, frameOffset); //Why i need +8 for the packet to be sent?
+    return frameBuffer.subarray(0, frameOffset);
 }
 
 function generateConnectionOpenFrame(){
@@ -134,7 +132,33 @@ function generateConnectionOpenFrame(){
     frameBuffer.writeUint32BE(frameOffset - 4 - 2, 3);
     frameBuffer.writeUInt8(0xCE, frameOffset += 1);
 
-    return frameBuffer.subarray(0, frameOffset + 8);
+    return frameBuffer.subarray(0, ++frameOffset);
+}
+
+function generateChannelOpenFrame(channelId){
+    const frameType = 1;
+    const classId = 20;
+    const methodId = 10; //Open
+    const channel = channelId; //connection related communication
+
+    const frameBuffer = Buffer.alloc(4096);
+
+    let frameOffset = 0;
+
+    frameBuffer.writeUInt8(frameType, frameOffset); // Frame type
+    frameBuffer.writeUInt16BE(channel, frameOffset += 1); // Channel
+    frameBuffer.writeUInt16BE(classId, frameOffset += (4+2)); // ClassID
+    frameBuffer.writeUInt16BE(methodId, frameOffset += 2);
+
+    frameBuffer.writeUint8(0, frameOffset += 1);
+
+    frameBuffer.writeUint32BE(frameOffset, 3);
+    frameBuffer.writeUint8(0xCE, frameOffset += 1);
+    return frameBuffer.subarray(0, ++frameOffset);
+}
+
+function heartbeatFrame(){
+    return Buffer.from(new Uint8Array([8, 0, 0, 0, 0, 0, 0, 206]));
 }
 
 async function run(){
@@ -146,12 +170,17 @@ async function run(){
         const type = view.getUint8(frameOffset);
         const channelId = view.getUint16(frameOffset += 1);
         const frameSize = view.getUint32(frameOffset += 2);
-        const frameEnd = view.getUint8((frameOffset += 4) + frameSize)
+        const frameEnd = view.getUint8((frameOffset += 4) + frameSize);
 
         console.log(JSON.stringify({type, channelId, frameSize, frameEnd}));
 
         if(frameEnd !== 206){
             throw new Error(`Frame end invalid ${frameEnd}`);
+        }
+
+        if(type === 8){
+            //NOT WORKING PROPERLY
+            connection.write(heartbeatFrame());
         }
 
         if(type === 1){
@@ -177,8 +206,8 @@ async function run(){
                 const frameSizeMax = view.getInt32(frameOffset += 2);
                 const heartBeat = view.getInt16(frameOffset += 4);
 
-                console.log(JSON.stringify({ channelMax, frameSizeMax, heartBeat }));
-                const responseFrame = generateTuneOkFrame(channelMax, frameSizeMax, heartBeat);
+                console.log('server tunning parameters', JSON.stringify({ channelMax, frameSizeMax, heartBeat }));
+                const responseFrame = generateTuneOkFrame(channelMax, 4096, 3);
 
                 const connectionOpenFrame = generateConnectionOpenFrame();
 
@@ -191,6 +220,17 @@ async function run(){
                 if(!connectionOpenPacket){
                     console.error(`Connection#Open was not sent`)
                 }
+            }
+
+            if(classId === 10 && methodId === 41){
+                console.log(`received Connection#OpenOk -> temporarily replying w/ Channel#Open`);
+                //const channelOpenFrame = generateChannelOpenFrame(1);
+                //connection.write(channelOpenFrame);
+            }
+
+            if(classId === 10 && methodId === 50){
+                console.log(`Received Connection#Close. Need to parse details`);
+                connection.destroy();
             }
         }
     }); 
