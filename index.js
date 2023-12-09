@@ -41,6 +41,8 @@ function generateStartOkBuffer(){
     const frameBuffer = Buffer.alloc(4096); // Add 1 for the frame end marker
     frameBuffer.writeUInt8(frameType, 0); // Frame type
     frameBuffer.writeUInt16BE(channel, 1); // Channel
+    //framesize + 2 = 3
+    //for clazz + 4 = 
     frameBuffer.writeUInt16BE(classId, 7); // Method ID
     frameBuffer.writeUint16BE(methodId, 7+2);
 
@@ -52,12 +54,10 @@ function generateStartOkBuffer(){
 
     let currentByteOffset = frameSize + argumentsLengthByteOffset + 4;
 
-    //PLAIN shortstring
     const mechanismBuffer = Buffer.from("PLAIN");
     frameBuffer.writeUint8(mechanismBuffer.byteLength, currentByteOffset);
     currentByteOffset += frameBuffer.write("PLAIN", ++currentByteOffset);
 
-    //006775657374006775657374
     const responseBuffer = Buffer.from(`\u0000guest\u0000guest`);
     frameBuffer.writeUint32BE(responseBuffer.byteLength, ++currentByteOffset); currentByteOffset += 4;
     currentByteOffset += frameBuffer.write(`\u0000guest\u0000guest`, currentByteOffset);
@@ -83,28 +83,85 @@ function generateStartOkBuffer(){
     return  finalBuffer;
 }
 
+function generateTuneOkFrame(channelMax, frameSizeMax, heartbeat){
+    const frameType = 1; //METHOD
+    const classId = 10;
+    const methodId = 31; //TuneOk
+    const channel = 0; //connection related communication
+
+    const frameBuffer = Buffer.alloc(frameSizeMax);
+
+    let frameOffset = 0;
+
+    frameBuffer.writeUInt8(frameType, frameOffset); // Frame type
+    frameBuffer.writeUInt16BE(channel, frameOffset += 1); // Channel
+    frameBuffer.writeUInt16BE(classId, frameOffset += (4+2)); // Method ID
+    frameBuffer.writeUInt16BE(methodId, frameOffset += 2);
+
+    frameBuffer.writeUInt16BE(channelMax, frameOffset += 2);
+    frameBuffer.writeUInt32BE(frameSizeMax, frameOffset += 2);
+    frameBuffer.writeUInt16BE(heartbeat, frameOffset += 4);
+
+    frameBuffer.writeUInt32BE(frameOffset - 4 - 1, 3);
+
+    frameBuffer.writeUInt8(0xCE, frameOffset += 2); frameOffset++;
+    
+    console.log(`packet size is ${frameOffset}`);
+
+    return frameBuffer.subarray(0, frameOffset); //Why i need +8 for the packet to be sent?
+}
+
+function generateConnectionOpenFrame(){
+    const frameType = 1;
+    const classId = 10;
+    const methodId = 40; //TuneOk
+    const channel = 0; //connection related communication
+
+    const frameBuffer = Buffer.alloc(4096);
+
+    let frameOffset = 0;
+
+    frameBuffer.writeUInt8(frameType, frameOffset); // Frame type
+    frameBuffer.writeUInt16BE(channel, frameOffset += 1); // Channel
+    frameBuffer.writeUInt16BE(classId, frameOffset += (4+2)); // ClassID
+    frameBuffer.writeUInt16BE(methodId, frameOffset += 2);
+
+    const vhost = Buffer.from("/");
+    frameBuffer.writeUint8(vhost.byteLength, frameOffset += 2);
+    vhost.copy(frameBuffer, frameOffset += 1);
+    frameOffset += 1 + 1;
+    
+    frameBuffer.writeUint32BE(frameOffset - 4 - 2, 3);
+    frameBuffer.writeUInt8(0xCE, frameOffset += 1);
+
+    return frameBuffer.subarray(0, frameOffset + 8);
+}
+
 async function run(){
     const connection = new Socket();
     process.on('SIGINT', () => connection.destroy())
     connection.on('data', (data) => {
+        let frameOffset = 0;
         const view = new DataView(data.buffer);
-        const type = view.getUint8(0);
-        const channelId = view.getUint16(1);
-        const frameSize = view.getUint32(3);
-        const frameEnd = view.getUint8(7 + frameSize)
-        console.log(type, channelId, frameSize, frameEnd);
+        const type = view.getUint8(frameOffset);
+        const channelId = view.getUint16(frameOffset += 1);
+        const frameSize = view.getUint32(frameOffset += 2);
+        const frameEnd = view.getUint8((frameOffset += 4) + frameSize)
+
+        console.log(JSON.stringify({type, channelId, frameSize, frameEnd}));
 
         if(frameEnd !== 206){
-            throw new Error('Frame end invalid');
+            throw new Error(`Frame end invalid ${frameEnd}`);
         }
 
         if(type === 1){
-            const classId = view.getUint16(7);
-            const methodId = view.getUint16(7 + 2);
-            console.log(classId, methodId);
+            console.log(`Received Method`);
+            const classId = view.getUint16(frameOffset);
+            const methodId = view.getUint16(frameOffset +=  2);
+            console.log(JSON.stringify({ classId, methodId }));
+
             if(classId === 10 && methodId === 10){
                 console.log(`Received Connection#Start -> replying Connection#Start.Ok`);
-//                connection.write(frameBuffer);
                 const frame = generateStartOkBuffer();
 //                const frame = new ConnectionStartOk().toBuffer();
                 console.log(`writing package with byteLength ${frame.byteLength}`)
@@ -112,7 +169,29 @@ async function run(){
                 if(!flushed){
                     console.error('packet was not sent')
                 }
-            }   
+            }
+
+            if(classId === 10 && methodId === 30){
+                console.log(`Received Connection#Tune -> replying w/ Connection#TuneOk & Connection#Open`);
+                const channelMax = view.getInt16(frameOffset += 2);
+                const frameSizeMax = view.getInt32(frameOffset += 2);
+                const heartBeat = view.getInt16(frameOffset += 4);
+
+                console.log(JSON.stringify({ channelMax, frameSizeMax, heartBeat }));
+                const responseFrame = generateTuneOkFrame(channelMax, frameSizeMax, heartBeat);
+
+                const connectionOpenFrame = generateConnectionOpenFrame();
+
+                const packetSent = connection.write(responseFrame);
+                if(!packetSent){
+                    console.error(`Connection#TuneOk was not sent`)
+                }
+
+                const connectionOpenPacket = connection.write(connectionOpenFrame);
+                if(!connectionOpenPacket){
+                    console.error(`Connection#Open was not sent`)
+                }
+            }
         }
     }); 
 
