@@ -1,8 +1,8 @@
 import { Socket } from 'net';
-import { ShortString, LongString, ShortInt } from './amqp-data-types';
+import { ShortString, LongString, ShortInt, LongInt, LongLongInt } from './amqp-data-types';
 import { Buffer } from 'buffer';
 import { ChannelOpen } from './channel-frame';
-import { ConnectionOpen } from './connection-frames';
+import { ConnectionOpen, ConnectionTuneOk } from './connection-frames';
 
 const FRAME_SIZE_FOUR_OCTETS = 4;
 const FRAME_TYPE_OCTET = 1;
@@ -67,31 +67,12 @@ function generateStartOkBuffer(){
     return  frameBuffer.subarray(0, ++bOffset);
 }
 
-function generateTuneOkFrame(channelMax, frameSizeMax, heartbeat){
-    const frameType = 1; //METHOD
-    const classId = 10;
-    const methodId = 31; //TuneOk
-    const channel = 0; //connection related communication
-
-    const frameBuffer = Buffer.alloc(frameSizeMax);
-
-    let frameOffset = 0;
-
-    frameBuffer.writeUInt8(frameType, frameOffset); frameOffset += 1;
-    frameBuffer.writeUInt16BE(channel, frameOffset); frameOffset += 2;
-    frameOffset += 4;
-    frameBuffer.writeUInt16BE(classId, frameOffset); frameOffset += 2;
-    frameBuffer.writeUInt16BE(methodId, frameOffset); frameOffset += 2;
-
-    frameBuffer.writeUInt16BE(channelMax, frameOffset); frameOffset += 2;
-    frameBuffer.writeUInt32BE(frameSizeMax, frameOffset); frameOffset += 4;
-    frameBuffer.writeUInt16BE(heartbeat, frameOffset); frameOffset += 2;
-
-    frameBuffer.writeUInt32BE(frameOffset - FRAME_HEADER_SIZE, 3);
-
-    frameBuffer.writeUInt8(0xCE, frameOffset); frameOffset++;
-
-    return frameBuffer.subarray(0, frameOffset);
+function generateTuneOkFrame(channelMax: number, frameSizeMax: number, heartbeat: number){
+    return new ConnectionTuneOk(
+        new LongInt(channelMax),
+        new LongLongInt(frameSizeMax),
+        new LongInt(heartbeat)
+    ).getBuffer();
 }
 
 function generateConnectionOpenFrame(){
@@ -102,7 +83,7 @@ function generateConnectionOpenFrame(){
     ).getBuffer();
 }
 
-function generateChannelOpenFrame(channelId){
+function generateChannelOpenFrame(channelId: number){
     return new ChannelOpen(channelId, new ShortInt(0)).getBuffer();
 }
 

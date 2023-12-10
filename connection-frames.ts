@@ -1,4 +1,4 @@
-import { LongString, ShortInt, ShortString, Table } from "./amqp-data-types";
+import { LongInt, LongLongInt, LongString, ShortInt, ShortString, Table } from "./amqp-data-types";
 import { AMQPMethodFrame, AMQPConnectionMethod, AMQPClassesId  } from "./base-frames";
 
 export type ConnectionProperties = {
@@ -20,6 +20,20 @@ export class ConnectionOpen extends AMQPMethodFrame {
         this.apply(vhost);
         this.apply(reservedOne);
         this.apply(reservedTwo);
+        this.endFrame();
+    }
+}
+
+export class ConnectionTuneOk extends AMQPMethodFrame {
+    constructor(
+        private readonly _channelMax: LongInt,
+        private readonly _frameSizeMax: LongLongInt,
+        private readonly _heartbeat: LongInt
+    ){
+        super(AMQPClassesId.CONNECTION, AMQPConnectionMethod.TUNE_OK, DEFAULT_CONNECTION_CHANNEL);
+        this.apply(_channelMax);
+        this.apply(_frameSizeMax);
+        this.apply(_heartbeat);
         this.endFrame();
     }
 }

@@ -65,3 +65,35 @@ export class ShortInt implements AMQPDataType {
         return this._buffer;
     }
 }
+
+export class LongInt implements AMQPDataType {
+    private readonly _buffer: Buffer;
+    constructor(private readonly _value: number){
+        this._buffer = Buffer.alloc(2);
+        this._buffer.writeUInt16BE(_value, 0);
+    }
+
+    copyTo(buffer: Buffer, offset: number): number {
+        return this._buffer.copy(buffer, offset);
+    }
+
+    getBuffer(): Buffer {
+        return this._buffer;
+    }
+}
+
+export class LongLongInt implements AMQPDataType {
+    private readonly _buffer: Buffer;
+    constructor(private readonly _value: number){
+        this._buffer = Buffer.alloc(4);
+        this._buffer.writeInt32BE(_value, 0);
+    }
+
+    copyTo(buffer: Buffer, offset: number): number {
+        return this._buffer.copy(buffer, offset);
+    }
+
+    getBuffer(): Buffer {
+        return this._buffer;
+    }
+}
