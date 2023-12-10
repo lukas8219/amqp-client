@@ -1,8 +1,8 @@
 import { Socket } from 'net';
-import { ShortString, LongString, ShortInt, LongInt, LongLongInt, Table } from './amqp-data-types';
+import { ShortString, LongString, ShortInt, LongInt, LongLongInt, Table } from './lib/amqp-data-types';
 import { Buffer } from 'buffer';
-import { ChannelOpen } from './channel-frame';
-import { ConnectionOpen, ConnectionStartOk, ConnectionTuneOk } from './connection-frames';
+import { ChannelOpen } from './lib/channel-frame';
+import { ConnectionOpen, ConnectionStartOk, ConnectionTuneOk } from './lib/connection-frames';
 
 function generateStartOkBuffer(){
     const clientProperties = {
