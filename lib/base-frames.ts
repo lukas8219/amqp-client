@@ -64,3 +64,14 @@ export class AMQPMethodFrame {
     }
 }
 
+
+export class ProtocolFrame {
+    private readonly _buffer: Buffer;
+    constructor(){
+        this._buffer = Buffer.from(`AMQP${String.fromCharCode(0,0,9,1)}`);
+    }
+
+    getBuffer(){
+        return this._buffer;
+    }
+}
