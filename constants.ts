@@ -3,6 +3,8 @@ const FRAME_TYPE_OCTET = 1;
 const FRAME_CHANNEL_OCTET = 2;
 export const FRAME_HEADER_SIZE = FRAME_SIZE_FOUR_OCTETS + FRAME_TYPE_OCTET + FRAME_CHANNEL_OCTET;
 
+export const FRAME_SIZE_OFFSET = 3;
+
 export const SINGLE_OCTET = 1;
 export const TWO_OCTET = 2;
 export const FOUR_OCTET = 4;

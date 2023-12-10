@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer';
+import { FOUR_OCTET, SINGLE_OCTET, TWO_OCTET } from './constants';
 
 export interface AMQPDataType {
     copyTo(buffer: Buffer, offset: number): number;
@@ -22,9 +23,9 @@ export class ShortString implements AMQPDataType {
         if(valueBuffer.byteLength > 255){
             throw new Error('Invalid ShortString. Max Length in Bytes 255');
         }
-        this._buffer = Buffer.alloc(1 + valueBuffer.byteLength);
+        this._buffer = Buffer.alloc(SINGLE_OCTET + valueBuffer.byteLength);
         this._buffer.writeUInt8(valueBuffer.byteLength, 0);
-        valueBuffer.copy(this._buffer, 1);
+        valueBuffer.copy(this._buffer, SINGLE_OCTET);
     }
 
     copyTo(buffer: Buffer, offset: number): number {
@@ -47,7 +48,7 @@ export class LongString implements AMQPDataType {
 
     constructor(value: string){
         this._valueBuffer = Buffer.from(value);
-        this._buffer = Buffer.alloc(4 + this._valueBuffer.byteLength);
+        this._buffer = Buffer.alloc(FOUR_OCTET + this._valueBuffer.byteLength);
         this._buffer.writeUInt32BE(this._valueBuffer.byteLength, 0);
         this._valueBuffer.copy(this._buffer, 4);
     }
@@ -69,16 +70,16 @@ export class Table<T extends Record<string, AMQPDataType>> implements AMQPDataTy
     private readonly _buffer: Buffer;
     constructor(record: T){
         let payloadBuffer = Buffer.alloc(4096);
-        let byteOffset = 4;
+        let byteOffset = 0 + FOUR_OCTET;
         //SKIP first FOUR bytes reserved for Table Size
         for(const [key,value] of Object.entries(record)){
             const fieldLength = new ShortString(key).copyTo(payloadBuffer, byteOffset); byteOffset += fieldLength;
 
-            payloadBuffer.writeUInt8(value.getDataType() as number, byteOffset); byteOffset += 1;
+            payloadBuffer.writeUInt8(value.getDataType() as number, byteOffset); byteOffset += SINGLE_OCTET;
             const writtenValueBytes = value.copyTo(payloadBuffer, byteOffset); byteOffset += writtenValueBytes;
         }
         //Subtract skipped 4 bytes from line 72;
-        payloadBuffer.writeUInt32BE(byteOffset - 4, 0);
+        payloadBuffer.writeUInt32BE(byteOffset - FOUR_OCTET, 0);
         this._buffer = payloadBuffer.subarray(0, byteOffset);
     }
 
@@ -117,7 +118,7 @@ export class ShortInt implements AMQPDataType {
 export class LongInt implements AMQPDataType {
     private readonly _buffer: Buffer;
     constructor(private readonly _value: number){
-        this._buffer = Buffer.alloc(2);
+        this._buffer = Buffer.alloc(TWO_OCTET);
         this._buffer.writeUInt16BE(_value, 0);
     }
 
@@ -137,7 +138,7 @@ export class LongInt implements AMQPDataType {
 export class LongLongInt implements AMQPDataType {
     private readonly _buffer: Buffer;
     constructor(private readonly _value: number){
-        this._buffer = Buffer.alloc(4);
+        this._buffer = Buffer.alloc(FOUR_OCTET);
         this._buffer.writeInt32BE(_value, 0);
     }
 

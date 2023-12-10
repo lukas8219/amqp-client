@@ -1,5 +1,5 @@
 import { AMQPDataType } from "./amqp-data-types";
-import { FRAME_HEADER_SIZE } from "./constants";
+import { FOUR_OCTET, FRAME_HEADER_SIZE, FRAME_SIZE_OFFSET, SINGLE_OCTET, TWO_OCTET } from "./constants";
 
 export enum AMQPClassesId {
     CONNECTION = 10,
@@ -36,11 +36,11 @@ export class AMQPMethodFrame {
         private readonly _methodId: AMQPChannelMethod | AMQPConnectionMethod,
         private readonly _channel: number
     ){
-        this._buffer.writeUInt8(AMQPFrameType.METHOD, this._currentOffset); this._currentOffset += 1;
-        this._buffer.writeUInt16BE(_channel, this._currentOffset); this._currentOffset += 2; 
-        this._currentOffset += 4;
-        this._buffer.writeUInt16BE(_classId, this._currentOffset); this._currentOffset += 2;
-        this._buffer.writeUInt16BE(_methodId, this._currentOffset); this._currentOffset += 2;
+        this._buffer.writeUInt8(AMQPFrameType.METHOD, this._currentOffset); this._currentOffset += SINGLE_OCTET;
+        this._buffer.writeUInt16BE(_channel, this._currentOffset); this._currentOffset += TWO_OCTET; 
+        this._currentOffset += FOUR_OCTET;
+        this._buffer.writeUInt16BE(_classId, this._currentOffset); this._currentOffset += TWO_OCTET;
+        this._buffer.writeUInt16BE(_methodId, this._currentOffset); this._currentOffset += TWO_OCTET;
     }
 
     apply(dataType: AMQPDataType){
@@ -54,8 +54,8 @@ export class AMQPMethodFrame {
     }
 
     endFrame(){
-        this._buffer.writeUint32BE(this._currentOffset - FRAME_HEADER_SIZE, 3);
-        this._buffer.writeUint8(0xCE, this._currentOffset); this._currentOffset += 1;
+        this._buffer.writeUint32BE(this._currentOffset - FRAME_HEADER_SIZE, FRAME_SIZE_OFFSET);
+        this._buffer.writeUint8(0xCE, this._currentOffset); this._currentOffset += SINGLE_OCTET;
     }
 
     getBuffer(){
