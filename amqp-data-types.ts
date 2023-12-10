@@ -1,4 +1,9 @@
-export class ShortString {
+export interface AMQPDataType {
+    copyTo(buffer: Buffer, offset: number): number;
+    getBuffer(): Buffer;
+}
+
+export class ShortString implements AMQPDataType {
     private _buffer: Buffer;
     constructor(value: string){
         const valueBuffer = Buffer.from(value);
@@ -13,10 +18,14 @@ export class ShortString {
     copyTo(buffer: Buffer, offset: number): number {
         return this._buffer.copy(buffer, offset);
     }
+
+    getBuffer(): Buffer {
+        return this._buffer;
+    }
     
 }
 
-export class LongString {
+export class LongString implements AMQPDataType {
     private _buffer: Buffer;
     private _valueBuffer: Buffer;
 
@@ -30,16 +39,27 @@ export class LongString {
     copyTo(buffer: Buffer, offset: number): number {
         return this._buffer.copy(buffer, offset);
     }
+
+    getBuffer(): Buffer {
+        return this._buffer;
+    }
 }
 
 export class Table<T extends object> {
     constructor(record: T){}
 }
 
-export class ShortInt {
-    constructor(private readonly _value: number){}
+export class ShortInt implements AMQPDataType {
+    private readonly _buffer: Buffer;
+    constructor(private readonly _value: number){
+        this._buffer = Buffer.from([this._value]);
+    }
 
     copyTo(buffer: Buffer, offset: number): number{
-        return Buffer.from([this._value]).copy(buffer, offset);
+        return this._buffer.copy(buffer, offset);
+    }
+
+    getBuffer() {
+        return this._buffer;
     }
 }
