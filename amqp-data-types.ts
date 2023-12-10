@@ -6,12 +6,12 @@ export class ShortString {
             throw new Error('Invalid ShortString. Max Length in Bytes 255');
         }
         this._buffer = Buffer.alloc(1 + valueBuffer.byteLength);
-        this._buffer.writeUint8(valueBuffer.byteLength, 0);
+        this._buffer.writeUInt8(valueBuffer.byteLength, 0);
         valueBuffer.copy(this._buffer, 1);
     }
 
     copyTo(buffer: Buffer, offset: number): number {
-        return this._buffer.copy(buffer, offset) - 1;
+        return this._buffer.copy(buffer, offset);
     }
     
 }
@@ -36,8 +36,10 @@ export class Table<T extends object> {
     constructor(record: T){}
 }
 
-class ShortInt {
-    constructor(value: number){
+export class ShortInt {
+    constructor(private readonly _value: number){}
 
+    copyTo(buffer: Buffer, offset: number): number{
+        return Buffer.from([this._value]).copy(buffer, offset);
     }
 }

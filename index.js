@@ -1,7 +1,12 @@
 const { Socket } = require('net');
-const { ShortString, LongString } = require('./amqp-data-types');
+const { ShortString, LongString, ShortInt } = require('./amqp-data-types');
 
 const { Buffer } = require('buffer');
+
+const FRAME_SIZE_FOUR_OCTETS = 4;
+const FRAME_TYPE_OCTET = 1;
+const FRAME_CHANNEL_OCTET = 2;
+const FRAME_HEADER_SIZE = FRAME_SIZE_FOUR_OCTETS + FRAME_TYPE_OCTET + FRAME_CHANNEL_OCTET;
 
 function generateStartOkBuffer(){
     // Connection.StartOk frame parameters
@@ -48,17 +53,16 @@ function generateStartOkBuffer(){
     frameBuffer.writeUInt16BE(classId, bOffset); bOffset += 2; // Method ID
     frameBuffer.writeUint16BE(methodId, bOffset); bOffset += 2;
 
-    //Writes clientProperties
+    //Writes clientProperties table size
     frameBuffer.writeUint32BE(frameSize, bOffset); bOffset += 4;
-
-    const writtenBytes = payloadBuffer.copy(frameBuffer, bOffset, 0, byteOffset); bOffset += writtenBytes;
+    const clientProperiesWrittenBytes = payloadBuffer.copy(frameBuffer, bOffset, 0, byteOffset); bOffset += clientProperiesWrittenBytes;
 
     const mechanismFrameLength = new ShortString("PLAIN").copyTo(frameBuffer, bOffset); bOffset += mechanismFrameLength;
-    const responseFrameLength = new LongString(`\u0000guest\u0000guest`).copyTo(frameBuffer, ++bOffset); bOffset += responseFrameLength;
+    const responseFrameLength = new LongString(`\u0000guest\u0000guest`).copyTo(frameBuffer, bOffset); bOffset += responseFrameLength;
     const localeFrameLength = new ShortString("en_US").copyTo(frameBuffer, bOffset); bOffset += localeFrameLength;
 
-    frameBuffer.writeUInt32BE(bOffset - 6, 3);
-    frameBuffer.writeUInt8(0xCE, ++bOffset); // Frame end marker
+    frameBuffer.writeUInt32BE(bOffset - FRAME_HEADER_SIZE, 3);
+    frameBuffer.writeUInt8(0xCE, bOffset);
     return  frameBuffer.subarray(0, ++bOffset);
 }
 
@@ -72,18 +76,19 @@ function generateTuneOkFrame(channelMax, frameSizeMax, heartbeat){
 
     let frameOffset = 0;
 
-    frameBuffer.writeUInt8(frameType, frameOffset); // Frame type
-    frameBuffer.writeUInt16BE(channel, frameOffset += 1); // Channel
-    frameBuffer.writeUInt16BE(classId, frameOffset += (4+2)); // Method ID
-    frameBuffer.writeUInt16BE(methodId, frameOffset += 2);
+    frameBuffer.writeUInt8(frameType, frameOffset); frameOffset += 1;
+    frameBuffer.writeUInt16BE(channel, frameOffset); frameOffset += 2;
+    frameOffset += 4;
+    frameBuffer.writeUInt16BE(classId, frameOffset); frameOffset += 2;
+    frameBuffer.writeUInt16BE(methodId, frameOffset); frameOffset += 2;
 
-    frameBuffer.writeUInt16BE(channelMax, frameOffset += 2);
-    frameBuffer.writeUInt32BE(frameSizeMax, frameOffset += 2);
-    frameBuffer.writeUInt16BE(heartbeat, frameOffset += 4);
+    frameBuffer.writeUInt16BE(channelMax, frameOffset); frameOffset += 2;
+    frameBuffer.writeUInt32BE(frameSizeMax, frameOffset); frameOffset += 4;
+    frameBuffer.writeUInt16BE(heartbeat, frameOffset); frameOffset += 2;
 
-    frameBuffer.writeUInt32BE(frameOffset - 4 - 1, 3);
+    frameBuffer.writeUInt32BE(frameOffset - FRAME_HEADER_SIZE, 3);
 
-    frameBuffer.writeUInt8(0xCE, frameOffset += 2); frameOffset++;
+    frameBuffer.writeUInt8(0xCE, frameOffset); frameOffset++;
 
     return frameBuffer.subarray(0, frameOffset);
 }
@@ -98,21 +103,22 @@ function generateConnectionOpenFrame(){
 
     let frameOffset = 0;
 
-    frameBuffer.writeUInt8(frameType, frameOffset); // Frame type
-    frameBuffer.writeUInt16BE(channel, frameOffset += 1); // Channel
-    frameBuffer.writeUInt16BE(classId, frameOffset += (4+2)); // ClassID
-    frameBuffer.writeUInt16BE(methodId, frameOffset += 2);
+    frameBuffer.writeUInt8(frameType, frameOffset); frameOffset += 1;
+    frameBuffer.writeUInt16BE(channel, frameOffset); frameOffset += 2;
+    frameOffset += 4;
+    frameBuffer.writeUInt16BE(classId, frameOffset); frameOffset += 2;
+    frameBuffer.writeUInt16BE(methodId, frameOffset); frameOffset += 2;
     
-    const vhostFrameLength = new ShortString("/").copyTo(frameBuffer, frameOffset += 2);
+    const vhostFrameLength = new ShortString("/").copyTo(frameBuffer, frameOffset);
     frameOffset += vhostFrameLength;
 
-    //SKIP Reserverd Bytes - two octets (8 bytes)
-    frameOffset += 1 + 1;
+    const reservedOne = new ShortInt(0).copyTo(frameBuffer, frameOffset); frameOffset += reservedOne;
+    const reservedTwo = new ShortInt(0).copyTo(frameBuffer, frameOffset); frameOffset += reservedTwo;
     
-    frameBuffer.writeUint32BE(frameOffset - 4 - 2, 3);
-    frameBuffer.writeUInt8(0xCE, frameOffset += 1);
+    frameBuffer.writeUint32BE(frameOffset - FRAME_HEADER_SIZE, 3);
+    frameBuffer.writeUInt8(0xCE, frameOffset); frameOffset += 1;
 
-    return frameBuffer.subarray(0, ++frameOffset);
+    return frameBuffer.subarray(0, frameOffset);
 }
 
 function generateChannelOpenFrame(channelId){
@@ -125,17 +131,19 @@ function generateChannelOpenFrame(channelId){
 
     let frameOffset = 0;
 
-    frameBuffer.writeUInt8(frameType, frameOffset); // Frame type
-    frameBuffer.writeUInt16BE(channel, frameOffset += 1); // Channel
-    frameBuffer.writeUInt16BE(classId, frameOffset += (4+2)); // ClassID
-    frameBuffer.writeUInt16BE(methodId, frameOffset += 2);
+    frameBuffer.writeUInt8(frameType, frameOffset); frameOffset += 1;
+    frameBuffer.writeUInt16BE(channel, frameOffset); frameOffset += 2; 
+    frameOffset += 4;
+    frameBuffer.writeUInt16BE(classId, frameOffset); frameOffset += 2;
+    frameBuffer.writeUInt16BE(methodId, frameOffset); frameOffset += 2;
 
-    frameBuffer.writeUInt8(0, frameOffset += 2);
-    ++frameOffset;
+    const reservedOne = new ShortInt(0).copyTo(frameBuffer, frameOffset); frameOffset += reservedOne;
 
-    frameBuffer.writeUInt32BE(5, 3);
-    frameBuffer.writeUInt8(0xCE, frameOffset);
-    return frameBuffer.subarray(0, ++frameOffset);
+    frameBuffer.writeUInt32BE(frameOffset - FRAME_HEADER_SIZE, 3);
+
+    frameBuffer.writeUInt8(0xCE, frameOffset); frameOffset += 1;
+
+    return frameBuffer.subarray(0, frameOffset);
 }
 
 function heartbeatFrame(){
