@@ -1,8 +1,9 @@
 import { Socket } from 'net';
 import { ShortString, LongString, ShortInt, LongInt, LongLongInt, Table } from './lib/amqp-data-types';
 import { Buffer } from 'buffer';
-import { ChannelOpen } from './lib/channel-frame';
+import { ChannelClose, ChannelOpen } from './lib/channel-frame';
 import { ConnectionOpen, ConnectionStartOk, ConnectionTuneOk } from './lib/connection-frames';
+import { AMQPChannelMethod, AMQPClassesId } from './lib/base-frames';
 
 function generateStartOkBuffer(){
     const clientProperties = {
@@ -10,31 +11,23 @@ function generateStartOkBuffer(){
         version: new LongString('1.0.0'),
     };
 
-    const mechanism = new ShortString('PLAIN');
-    const response = new LongString(`\u0000guest\u0000guest`);
-    const locale = new ShortString('en_US');
+    const mechanism = 'PLAIN';
+    const response = `\u0000guest\u0000guest`;
+    const locale = 'en_US';
 
     return new ConnectionStartOk(new Table(clientProperties), mechanism, response, locale).getBuffer();
 }
 
 function generateTuneOkFrame(channelMax: number, frameSizeMax: number, heartbeat: number){
-    return new ConnectionTuneOk(
-        new LongInt(channelMax),
-        new LongLongInt(frameSizeMax),
-        new LongInt(heartbeat)
-    ).getBuffer();
+    return new ConnectionTuneOk(channelMax, frameSizeMax, heartbeat).getBuffer();
 }
 
 function generateConnectionOpenFrame(){
-    return new ConnectionOpen(
-        new ShortString("/"),
-        new ShortInt(0),
-        new ShortInt(0)
-    ).getBuffer();
+    return new ConnectionOpen('/').getBuffer();
 }
 
 function generateChannelOpenFrame(channelId: number){
-    return new ChannelOpen(channelId, new ShortInt(0)).getBuffer();
+    return new ChannelOpen(channelId).getBuffer();
 }
 
 function heartbeatFrame(){
@@ -104,6 +97,11 @@ async function run(){
             if(classId === 10 && methodId === 41){
                 console.log(`received Connection#OpenOk -> temporarily replying w/ Channel#Open`);
                 const channelOpenFrame = generateChannelOpenFrame(1);
+                setTimeout(() => {
+                    console.log(`Closing channel`);
+                    const closeBuffer = new ChannelClose(1, 404, "porque eu quis", AMQPClassesId.CHANNEL, AMQPChannelMethod.OPEN).getBuffer();
+                    return connection.write(closeBuffer);
+                }, 1000)
                 return connection.write(channelOpenFrame);
             }
 

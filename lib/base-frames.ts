@@ -19,6 +19,7 @@ export enum AMQPConnectionMethod {
 export enum AMQPChannelMethod {
     OPEN = 10,
     OPEN_OK = 11,
+    CLOSE = 40,
 }
 
 export enum AMQPFrameType {
