@@ -1,9 +1,8 @@
-const { Socket } = require('net');
-const { ShortString, LongString, ShortInt } = require('./amqp-data-types');
-
-const { Buffer } = require('buffer');
-const { ChannelOpen } = require('./channel-frame');
-const { ConnectionOpen } = require('./connection-frames');
+import { Socket } from 'net';
+import { ShortString, LongString, ShortInt } from './amqp-data-types';
+import { Buffer } from 'buffer';
+import { ChannelOpen } from './channel-frame';
+import { ConnectionOpen } from './connection-frames';
 
 const FRAME_SIZE_FOUR_OCTETS = 4;
 const FRAME_TYPE_OCTET = 1;

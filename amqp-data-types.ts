@@ -1,3 +1,5 @@
+import { Buffer } from 'node:buffer';
+
 export interface AMQPDataType {
     copyTo(buffer: Buffer, offset: number): number;
     getBuffer(): Buffer;
