@@ -1,70 +1,20 @@
 import { Socket } from 'net';
-import { ShortString, LongString, ShortInt, LongInt, LongLongInt } from './amqp-data-types';
+import { ShortString, LongString, ShortInt, LongInt, LongLongInt, Table } from './amqp-data-types';
 import { Buffer } from 'buffer';
 import { ChannelOpen } from './channel-frame';
-import { ConnectionOpen, ConnectionTuneOk } from './connection-frames';
-
-const FRAME_SIZE_FOUR_OCTETS = 4;
-const FRAME_TYPE_OCTET = 1;
-const FRAME_CHANNEL_OCTET = 2;
-const FRAME_HEADER_SIZE = FRAME_SIZE_FOUR_OCTETS + FRAME_TYPE_OCTET + FRAME_CHANNEL_OCTET;
+import { ConnectionOpen, ConnectionStartOk, ConnectionTuneOk } from './connection-frames';
 
 function generateStartOkBuffer(){
-    // Connection.StartOk frame parameters
     const clientProperties = {
-        product: 'MyApp',
-        version: '1.0.0',
+        product: new LongString('MyApp'),
+        version: new LongString('1.0.0'),
     };
 
-    // Convert client properties to a buffer
-    let payloadBuffer = Buffer.alloc(4096);
-    let byteOffset = 0;
-    for(const [key,value] of Object.entries(clientProperties)){
-        const keyBuffer = Buffer.from(key);
-        const valueBuffer = Buffer.from(value);
-        //shortstring - length + value WRITES THE FIELD NAME
-        payloadBuffer.writeUint8(keyBuffer.byteLength, byteOffset); byteOffset++;
-        byteOffset += payloadBuffer.write(key, byteOffset);
-        
-        //set field value - for now only string WRITES THE FIELD VALUE
-        payloadBuffer.writeUint8('S'.charCodeAt(0), byteOffset); byteOffset++;
-        payloadBuffer.writeUint32BE(valueBuffer.byteLength, byteOffset); byteOffset += 4;
-        byteOffset += payloadBuffer.write(value, byteOffset);
-    }
+    const mechanism = new ShortString('PLAIN');
+    const response = new LongString(`\u0000guest\u0000guest`);
+    const locale = new ShortString('en_US');
 
-    payloadBuffer = payloadBuffer.subarray(0, byteOffset);
-    
-    // Calculate the correct frame size
-    const frameSize = payloadBuffer.byteLength;
-
-    // Generate the Connection.StartOk frame
-    const classId = 10; // Connection.StartOk method ID
-    const methodId = 11;
-    const frameType = 1; // Connection.StartOk frame type -> METHOD
-    const channel = 0; // For connection-level frames
-
-    const frameBuffer = Buffer.alloc(4096); // Add 1 for the frame end marker
-
-    let bOffset = 0;
-
-    frameBuffer.writeUInt8(frameType, bOffset); bOffset += 1; // Frame type offset 0
-    frameBuffer.writeUInt16BE(channel, bOffset); bOffset += 2 // Channel offset 1
-    //RESERVE 3rd - 7th byte (4 octets) for Frame Size offset 3 - 4 octets
-    bOffset += 4;
-    frameBuffer.writeUInt16BE(classId, bOffset); bOffset += 2; // Method ID
-    frameBuffer.writeUint16BE(methodId, bOffset); bOffset += 2;
-
-    //Writes clientProperties table size
-    frameBuffer.writeUint32BE(frameSize, bOffset); bOffset += 4;
-    const clientProperiesWrittenBytes = payloadBuffer.copy(frameBuffer, bOffset, 0, byteOffset); bOffset += clientProperiesWrittenBytes;
-
-    const mechanismFrameLength = new ShortString("PLAIN").copyTo(frameBuffer, bOffset); bOffset += mechanismFrameLength;
-    const responseFrameLength = new LongString(`\u0000guest\u0000guest`).copyTo(frameBuffer, bOffset); bOffset += responseFrameLength;
-    const localeFrameLength = new ShortString("en_US").copyTo(frameBuffer, bOffset); bOffset += localeFrameLength;
-
-    frameBuffer.writeUInt32BE(bOffset - FRAME_HEADER_SIZE, 3);
-    frameBuffer.writeUInt8(0xCE, bOffset);
-    return  frameBuffer.subarray(0, ++bOffset);
+    return new ConnectionStartOk(new Table(clientProperties), mechanism, response, locale).getBuffer();
 }
 
 function generateTuneOkFrame(channelMax: number, frameSizeMax: number, heartbeat: number){

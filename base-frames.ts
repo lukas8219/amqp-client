@@ -1,4 +1,5 @@
 import { AMQPDataType } from "./amqp-data-types";
+import { FRAME_HEADER_SIZE } from "./constants";
 
 export enum AMQPClassesId {
     CONNECTION = 10,
@@ -53,7 +54,7 @@ export class AMQPMethodFrame {
     }
 
     endFrame(){
-        this._buffer.writeUint32BE(this._currentOffset - 7, 3);
+        this._buffer.writeUint32BE(this._currentOffset - FRAME_HEADER_SIZE, 3);
         this._buffer.writeUint8(0xCE, this._currentOffset); this._currentOffset += 1;
     }
 

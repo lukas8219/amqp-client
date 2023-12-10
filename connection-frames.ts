@@ -2,8 +2,8 @@ import { LongInt, LongLongInt, LongString, ShortInt, ShortString, Table } from "
 import { AMQPMethodFrame, AMQPConnectionMethod, AMQPClassesId  } from "./base-frames";
 
 export type ConnectionProperties = {
-    product: string,
-    version: string,
+    product: LongString,
+    version: LongString,
 }
 
 const DEFAULT_CONNECTION_CHANNEL = 0;
@@ -11,6 +11,11 @@ const DEFAULT_CONNECTION_CHANNEL = 0;
 export class ConnectionStartOk extends AMQPMethodFrame {
     constructor(connectionProperties: Table<ConnectionProperties>, mechanism: ShortString, response: LongString, locale: ShortString){
         super(AMQPClassesId.CONNECTION, AMQPConnectionMethod.START_OK, DEFAULT_CONNECTION_CHANNEL);
+        this.apply(connectionProperties);
+        this.apply(mechanism);
+        this.apply(response);
+        this.apply(locale);
+        this.endFrame();
     }
 }
 
