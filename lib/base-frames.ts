@@ -49,9 +49,6 @@ class AMQPFrame {
     }
 
     write(data: Buffer, offset: number = this._currentOffset){
-        if(!data.length){
-            return 0;
-        }
         const copied = data.copy(this._buffer, offset)
         this._currentOffset += copied;
         return copied;
@@ -86,8 +83,7 @@ export class AMQPContentHeaderFrame<T extends Record<string, AMQPDataType>> exte
         this._buffer.writeUInt16BE(AMQPClassesId.BASIC, this._currentOffset); this._currentOffset += TWO_OCTET;
         this.apply(new LongInt(0));
         this.apply(new Long64Int(payloadSize));
-        this.apply(new ShortInt(2000));
-        this.apply(headers);
+        this.apply(new LongInt(propertyFlag));
         this.endFrame();
     }
 }
