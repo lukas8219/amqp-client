@@ -83,6 +83,9 @@ export class AMQPContentHeaderFrame<T extends Record<string, AMQPDataType>> exte
         this._buffer.writeUInt16BE(AMQPClassesId.BASIC, this._currentOffset); this._currentOffset += TWO_OCTET;
         this.apply(new LongInt(0));
         this.apply(new Long64Int(payloadSize));
+        //TODO We need to add PropertyFlags logic
+        //For reference on CloudAMQP lib 
+        // https://github.com/cloudamqp/amqp-client.js/blob/53c620de4d3c020739c1de0469aeacee3af31ea8/src/amqp-view.ts#L159
         this.apply(new LongInt(propertyFlag));
         this.endFrame();
     }
