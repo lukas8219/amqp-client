@@ -98,7 +98,7 @@ async function run(){
                 console.log(`received Connection#OpenOk -> temporarily replying w/ Channel#Open`);
                 const channelOpenFrame = generateChannelOpenFrame(1);
                 setTimeout(() => {
-                    console.log(`Closing channel`);
+                    console.log(`sending Basic.Publish`)
                     const closeBuffer = new ChannelClose(1, 404, "porque eu quis", AMQPClassesId.CHANNEL, AMQPChannelMethod.OPEN).getBuffer();
                     return connection.write(closeBuffer);
                 }, 1000)

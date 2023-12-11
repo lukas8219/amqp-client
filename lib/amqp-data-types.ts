@@ -14,6 +14,7 @@ enum AMQPTableTypes {
     LONG_INT = 'I'.charCodeAt(0),
     LONG_LONG_INT = 'L'.charCodeAt(0),
     TABLE = 'T',
+    BOOLEAN = 'B'
 }
 
 export class ShortString implements AMQPDataType {
@@ -152,5 +153,57 @@ export class LongLongInt implements AMQPDataType {
 
     getDataType(): AMQPTableTypes {
         return AMQPTableTypes.LONG_LONG_INT;
+    }
+}
+
+export class Long64Int implements AMQPDataType {
+    private readonly _buffer: Buffer;
+    constructor(private readonly _value: number){
+        this._buffer = Buffer.alloc(FOUR_OCTET * 2);
+        this._buffer.writeBigUInt64BE(BigInt(_value), 0);
+    }
+
+    copyTo(buffer: Buffer, offset: number): number {
+        return this._buffer.copy(buffer, offset);
+    }
+
+    getBuffer(): Buffer {
+        return this._buffer;
+    }
+
+    getDataType(): AMQPTableTypes {
+        return AMQPTableTypes.LONG_LONG_INT;
+    }
+}
+
+export class BooleanBit implements AMQPDataType {
+    private readonly _buffer: Buffer;
+    constructor(value: boolean){
+        this._buffer = Buffer.from([value === true ? 1 : 0]);
+    }
+    copyTo(buffer: Buffer, offset: number): number {
+        return this._buffer.copy(buffer);
+    }
+    getBuffer(): Buffer {
+        return this._buffer;
+    }
+    getDataType(): AMQPTableTypes {
+        return AMQPTableTypes.BOOLEAN
+    }
+}
+
+export class BooleanSequence implements AMQPDataType {
+    private readonly _buffer: Buffer;
+    constructor(private readonly values: boolean[]){
+        this._buffer = Buffer.from([values.filter(Boolean).length]);
+    }
+    copyTo(buffer: Buffer, offset: number): number {
+        return this._buffer.copy(buffer, offset);
+    }
+    getBuffer(): Buffer {
+        return this._buffer;
+    }
+    getDataType(): AMQPTableTypes {
+        return AMQPTableTypes.BOOLEAN
     }
 }

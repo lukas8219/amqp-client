@@ -11,7 +11,7 @@ export class ChannelOpen extends AMQPMethodFrame {
 
 export class ChannelClose extends AMQPMethodFrame {
     constructor(
-        private readonly _channelId: number,
+        _channelId: number,
         private readonly replyCode: number,
         private readonly replyText: string,
         private readonly classId: AMQPClassesId,
