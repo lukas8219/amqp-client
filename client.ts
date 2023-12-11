@@ -1,9 +1,10 @@
 import { Socket } from "net";
-import { AMQPChannelMethod, AMQPClassesId, ProtocolFrame } from "./lib/base-frames";
+import { AMQPChannelMethod, AMQPClassesId, AMQPContentBodyFrame, AMQPContentHeaderFrame, ProtocolFrame } from "./lib/base-frames";
 import EventEmitter, { once } from "events";
 import { ConnectionOpen, ConnectionStartOk, ConnectionTuneOk } from "./lib/connection-frames";
 import { LongString, Table } from "./lib/amqp-data-types";
 import { ChannelClose, ChannelOpen } from "./lib/channel-frame";
+import { BasicPublish } from "./lib/basic-frames";
 
 async function createConnection(uri: string, options: any = {}): Promise<AMQPClient> {
     const sock = new Socket();
@@ -122,6 +123,14 @@ class AMQPChannel {
         private readonly __frameEmitter: EventEmitter,
     ){}
 
+    async publish(data: Buffer){
+        const publish = new BasicPublish(this._channelId, '', 'flow-controller', false, false).getBuffer();
+        const contentHeader = new AMQPContentHeaderFrame(this._channelId, data.byteLength, 0, new Table({})).getBuffer();
+        const payload = new AMQPContentBodyFrame(this._channelId, data).getBuffer();
+        this._sock.write(Buffer.concat([publish, contentHeader, payload]));
+        return;
+    }
+
     async close(){
         this._sock.write(new ChannelClose(this._channelId, 200, "Client closed connection", AMQPClassesId.CHANNEL, AMQPChannelMethod.CLOSE).getBuffer());
         await once(this.__frameEmitter, 'Channel#CloseOk');
@@ -130,3 +139,4 @@ class AMQPChannel {
 
 const client = await createConnection('amqp://localhost:5672');
 const channel = await client.createChannel();
+channel.publish(Buffer.from('o'));

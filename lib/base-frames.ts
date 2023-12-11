@@ -1,9 +1,10 @@
-import { AMQPDataType } from "./amqp-data-types";
+import { AMQPDataType, Long64Int, LongInt, LongLongInt, ShortInt, Table } from "./amqp-data-types";
 import { FOUR_OCTET, FRAME_HEADER_SIZE, FRAME_SIZE_OFFSET, SINGLE_OCTET, TWO_OCTET } from "./constants";
 
 export enum AMQPClassesId {
     CONNECTION = 10,
     CHANNEL = 20,
+    BASIC = 60,
 }
 
 export enum AMQPConnectionMethod {
@@ -22,26 +23,25 @@ export enum AMQPChannelMethod {
     CLOSE = 40,
 }
 
+export enum AMQPBasicMethod {
+    PUBLISH = 40,
+}
+
 export enum AMQPFrameType {
     METHOD = 1,
+    CONTENT_HEADER = 2,
+    CONTENT_BODY = 3,
     HEARTBEAT = 8,
 }
 
-export class AMQPMethodFrame {
+class AMQPFrame {
+    protected readonly _buffer: Buffer = Buffer.alloc(4096);
+    protected _currentOffset = 0;
 
-    private readonly _buffer: Buffer = Buffer.alloc(4096);
-    private _currentOffset = 0;
-
-    constructor(
-        private readonly _classId: AMQPClassesId,
-        private readonly _methodId: AMQPChannelMethod | AMQPConnectionMethod,
-        private readonly _channel: number
-    ){
-        this._buffer.writeUInt8(AMQPFrameType.METHOD, this._currentOffset); this._currentOffset += SINGLE_OCTET;
-        this._buffer.writeUInt16BE(_channel, this._currentOffset); this._currentOffset += TWO_OCTET; 
-        this._currentOffset += FOUR_OCTET;
-        this._buffer.writeUInt16BE(_classId, this._currentOffset); this._currentOffset += TWO_OCTET;
-        this._buffer.writeUInt16BE(_methodId, this._currentOffset); this._currentOffset += TWO_OCTET;
+    constructor(private _methodType: AMQPFrameType, private _channelId: number){
+        this._buffer.writeUint8(_methodType, this._currentOffset); this._currentOffset += SINGLE_OCTET;
+        this._buffer.writeUInt16BE(_channelId, this._currentOffset); this._currentOffset += TWO_OCTET;
+        this._currentOffset += 4;
     }
 
     apply(dataType: AMQPDataType){
@@ -61,6 +61,46 @@ export class AMQPMethodFrame {
 
     getBuffer(){
         return this._buffer.subarray(0, this._currentOffset);
+    }
+}
+
+export class AMQPMethodFrame extends AMQPFrame {
+
+    constructor(
+        private readonly _classId: AMQPClassesId,
+        private readonly _methodId: AMQPChannelMethod | AMQPConnectionMethod | AMQPBasicMethod,
+        private readonly _channel: number
+    ){
+        super(AMQPFrameType.METHOD, _channel);
+        this._buffer.writeUInt16BE(_classId, this._currentOffset); this._currentOffset += TWO_OCTET;
+        this._buffer.writeUInt16BE(_methodId, this._currentOffset); this._currentOffset += TWO_OCTET;
+    }
+}
+
+export class AMQPContentHeaderFrame<T extends Record<string, AMQPDataType>> extends AMQPFrame {
+    constructor(private _channel: number, payloadSize: number, propertyFlag: number, headers: Table<T>){
+        super(AMQPFrameType.CONTENT_HEADER, _channel);
+        this._buffer.writeUInt16BE(AMQPClassesId.BASIC, this._currentOffset); this._currentOffset += TWO_OCTET;
+        this.apply(new LongInt(0));
+        this.apply(new Long64Int(payloadSize));
+        //TODO We need to add PropertyFlags logic
+        //For reference on CloudAMQP lib 
+        // https://github.com/cloudamqp/amqp-client.js/blob/53c620de4d3c020739c1de0469aeacee3af31ea8/src/amqp-view.ts#L159
+        this.apply(new LongInt(propertyFlag));
+        this.endFrame();
+    }
+}
+
+export class AMQPContentBodyFrame extends AMQPFrame {
+    constructor(private _channel: number, data: Buffer){
+        super(AMQPFrameType.CONTENT_BODY, _channel);
+        this.write(data);
+        this.endFrame(data.byteLength);
+    }
+
+    endFrame(payloadSize: number = this._currentOffset){
+        this._buffer.writeUInt32BE(payloadSize, 3);
+        this._buffer.writeUint8(0xCE, this._currentOffset); this._currentOffset++;
     }
 }
 
