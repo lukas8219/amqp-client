@@ -4,7 +4,13 @@ import { FOUR_OCTET, FRAME_HEADER_SIZE, FRAME_SIZE_OFFSET, SINGLE_OCTET, TWO_OCT
 export enum AMQPClassesId {
     CONNECTION = 10,
     CHANNEL = 20,
+    EXCHANGE = 40,
+    QUEUE = 50,
     BASIC = 60,
+}
+
+export enum AMQPQueueMethod {
+    DECLARE = 10,
 }
 
 export enum AMQPConnectionMethod {
@@ -68,7 +74,7 @@ export class AMQPMethodFrame extends AMQPFrame {
 
     constructor(
         private readonly _classId: AMQPClassesId,
-        private readonly _methodId: AMQPChannelMethod | AMQPConnectionMethod | AMQPBasicMethod,
+        private readonly _methodId: AMQPChannelMethod | AMQPConnectionMethod | AMQPBasicMethod | AMQPQueueMethod,
         private readonly _channel: number
     ){
         super(AMQPFrameType.METHOD, _channel);
